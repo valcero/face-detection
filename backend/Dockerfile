@@ -4,6 +4,10 @@ FROM python:3.12-slim
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     ffmpeg \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender1 \
     libavformat-dev \
     libavcodec-dev \
     libavutil-dev \

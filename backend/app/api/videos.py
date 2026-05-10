@@ -12,6 +12,7 @@ from app.api.schemas import RoiFrame, RoiResponse, VideoCreateResponse
 from app.db import get_db_session
 from app.models import FrameRoi, Video
 from app.settings import settings
+from app.services.video_pipeline import process_video_to_mp4
 
 
 router = APIRouter(prefix="/api/videos", tags=["videos"])
@@ -20,7 +21,7 @@ _ALLOWED_TYPES = {
     "video/mp4",
     "video/webm",
     "video/quicktime",
-    "application/octet-stream",  # some browsers/tools mislabel; we still keep extension checks minimal
+    "application/octet-stream",  # some browsers/tools mislabel
 }
 
 
@@ -52,7 +53,6 @@ async def create_video(
     original_name = file.filename or "upload"
     suffix = Path(original_name).suffix.lower()
     if suffix not in {".mp4", ".webm", ".mov"}:
-        # Keep this strict so our later processing assumptions remain sane.
         raise HTTPException(status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, detail="Unsupported file extension")
 
     video = Video(original_filename=original_name, content_type=content_type or "application/octet-stream", status="processing")
@@ -75,7 +75,7 @@ async def create_video(
                     raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="File too large")
                 f.write(chunk)
     except HTTPException:
-        # Cleanup and mark failed if we already created the record.
+        # Cleanup and mark failed if  already created the record.
         if dst.exists():
             try:
                 dst.unlink()
@@ -96,7 +96,15 @@ async def create_video(
         await db.commit()
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Upload failed") from e
 
-    # Pipeline step will transform raw → processed and fill ROI rows; for now it's just queued/processing.
+    # Synchronous pipeline for short demo clips: raw → processed, and fill ROI rows.
+    try:
+        await process_video_to_mp4(video=video, input_path=dst, output_path=_processed_path(video.id), db=db)
+    except Exception as e:
+        video.status = "failed"
+        video.error_message = f"processing failed: {e.__class__.__name__}"
+        await db.commit()
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Video processing failed") from e
+
     response.headers["Location"] = f"/api/videos/{video.id}/stream"
     return VideoCreateResponse(video_id=str(video.id), status=video.status)
 
