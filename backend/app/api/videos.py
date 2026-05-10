@@ -75,7 +75,7 @@ async def create_video(
                     raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="File too large")
                 f.write(chunk)
     except HTTPException:
-        # Cleanup and mark failed if  already created the record.
+        
         if dst.exists():
             try:
                 dst.unlink()
@@ -101,7 +101,7 @@ async def create_video(
         await process_video_to_mp4(video=video, input_path=dst, output_path=_processed_path(video.id), db=db)
     except Exception as e:
         video.status = "failed"
-        video.error_message = f"processing failed: {e.__class__.__name__}"
+        video.error_message = f"processing failed: {e.__class__.__name__}: {e}"
         await db.commit()
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Video processing failed") from e
 

@@ -17,7 +17,7 @@ target_metadata = Base.metadata
 
 def _sync_database_url(async_url: str) -> str:
     # Alembic migrations run in sync mode.
-    return async_url.replace("postgresql+asyncpg://", "postgresql://")
+    return async_url.replace("postgresql+asyncpg://", "postgresql+psycopg://")
 
 
 def get_url() -> str:

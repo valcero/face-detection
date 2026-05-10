@@ -1,8 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 
 import mediapipe as mp
+from mediapipe.tasks.python import BaseOptions
+from mediapipe.tasks.python.vision import FaceDetector as MpFaceDetector
+from mediapipe.tasks.python.vision import FaceDetectorOptions, RunningMode
 
 
 @dataclass(frozen=True)
@@ -16,41 +20,44 @@ class Detection:
 
 class FaceDetector:
     """
-    Minimal wrapper around MediaPipe Face Detection.
+    Minimal wrapper around MediaPipe Tasks FaceDetector.
     Returns an axis-aligned bounding box in pixel coordinates for a single face.
     """
 
-    def __init__(self) -> None:
-        self._mp = mp.solutions.face_detection
-        self._detector = self._mp.FaceDetection(model_selection=0, min_detection_confidence=0.5)
+    def __init__(self, model_path: str | Path = "/app/models/blaze_face_short_range.tflite") -> None:
+        options = FaceDetectorOptions(
+            base_options=BaseOptions(model_asset_path=str(model_path)),
+            running_mode=RunningMode.IMAGE,
+        )
+        self._detector = MpFaceDetector.create_from_options(options)
 
     def detect_one(self, rgb_image, width: int, height: int) -> Detection | None:
-        # MediaPipe expects RGB input.
-        results = self._detector.process(rgb_image)
-        if not results.detections:
+        image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb_image)
+        result = self._detector.detect(image)
+        if not result.detections:
             return None
 
-        # Single-face assumption: pick the highest score.
+        # Single-face assumption: pick the highest confidence detection.
         best = None
         best_score = -1.0
-        for d in results.detections:
+        for det in result.detections:
             score = None
-            if d.score:
-                score = float(d.score[0])
+            if det.categories:
+                score = float(det.categories[0].score)
             if score is None:
                 score = 0.0
             if score > best_score:
-                best = d
+                best = det
                 best_score = score
 
         if best is None:
             return None
 
-        rbb = best.location_data.relative_bounding_box
-        x = int(rbb.xmin * width)
-        y = int(rbb.ymin * height)
-        w = int(rbb.width * width)
-        h = int(rbb.height * height)
+        bbox = best.bounding_box
+        x = int(bbox.origin_x)
+        y = int(bbox.origin_y)
+        w = int(bbox.width)
+        h = int(bbox.height)
 
         # Clamp to frame bounds, keep non-negative.
         x = max(0, min(x, width - 1))
