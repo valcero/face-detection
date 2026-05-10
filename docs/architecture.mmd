@@ -1,0 +1,17 @@
+flowchart LR
+  User[Browser_User]
+
+  subgraph docker [Docker_Compose]
+    FE[Nginx_Frontend]
+    API[FastAPI_Backend]
+    DB[(PostgreSQL)]
+    VOL[Volumes_uploads_dbdata]
+  end
+
+  User -->|"HTTP:8080"| FE
+  FE -->|"/api/videos (upload)"| API
+  FE -->|"/api/videos/{id}/stream"| API
+  FE -->|"/api/videos/{id}/roi"| API
+  API -->|"SQL: videos + frame_rois"| DB
+  API -->|"writes raw + processed mp4"| VOL
+  DB -->|"db files"| VOL
