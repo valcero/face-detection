@@ -32,12 +32,13 @@ async def process_video_to_mp4(
     input_path: Path,
     output_path: Path,
     db: AsyncSession,
+    detector: FaceDetector | None = None,
 ) -> PipelineResult:
     """
     Decode input video, detect 1 face per frame, store ROI rows, and encode an annotated MP4.
     """
 
-    detector = FaceDetector()
+    detector = detector or FaceDetector()
     tmp_out = output_path.with_suffix(f".tmp-{uuid.uuid4().hex}.mp4")
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
