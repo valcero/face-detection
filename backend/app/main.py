@@ -3,8 +3,11 @@ from sqlalchemy import text
 from fastapi import FastAPI
 
 from app.db import async_session
+from app.api.videos import router as videos_router
 
 app = FastAPI(title="Face ROI API", version="0.1.0")
+
+app.include_router(videos_router)
 
 
 @app.get("/health")
